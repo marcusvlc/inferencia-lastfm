@@ -39,7 +39,28 @@ glimpse(lastfm)
 
 Utilizaremos ICs para estimar duas métricas sobre os usuários do LastFM em geral durante um período de 6 meses. Em ambos os casos faremos isso a partir de uma amostra de 300 usuários. As duas métricas são: 
 
-1. Qual a proporção de novos artistas em geral escutada por usuários?
+1. Qual a proporção de novos artistas escutados pelos usuários
+
+### Bootstrap implementado manualmente
+
+```{r}
+n_repeticoes = 2000
+
+proporcao_do_pai = lastfm %>% mutate(prop = news/(news+old)) %>% pull(prop) %>% mean()
+
+props_bootstraps = c()
+
+for(i in  1:n_repeticoes) {
+  prop_bootstrap_atual = lastfm %>% sample_n(300, replace = TRUE) %>% mutate(prop = news/(news+old)) %>% pull(prop) %>% mean()
+  props_bootstraps = c(props_bootstraps, prop_bootstrap_atual)
+}
+
+df_bootstraps = data.frame("bnum" = c(1:2000), "props" = props_bootstraps)
+  
+df_bootstraps %>% ggplot(aes(x=props) ) + geom_histogram(fill="navy", alpha=.4, col="black")
+
+```
+
+
 2. Para os usuários que gostam de música muito pop (mediana_pop > 5), qual a correlação entre a popularidade mediana dos artistas escutado e a proporção dos artistas escutados que eram novos. 
 
-Crie intervalos com 95% de confiança.
