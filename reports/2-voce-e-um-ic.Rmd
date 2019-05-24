@@ -16,6 +16,7 @@ output:
 ```{r setup, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(broom)
 theme_set(theme_bw())
 ```
 
@@ -57,10 +58,50 @@ for(i in  1:n_repeticoes) {
 
 df_bootstraps = data.frame("bnum" = c(1:2000), "props" = props_bootstraps)
   
-df_bootstraps %>% ggplot(aes(x=props) ) + geom_histogram(fill="navy", alpha=.4, col="black")
+df_bootstraps %>% ggplot(aes(x=props) ) + geom_histogram(fill="navy", alpha=.4, col="black") + geom_vline(aes(xintercept=proporcao_do_pai), color="red", size=2, alpha=.4)
+
+```
+### Bootsrap implementado com a biblioteca
+
+```{r}
+library(boot)
+
+theta_p <- function(d, i) {
+    d %>%
+    slice(i)  %>% 
+    mutate(prop = news/(news+old)) %>% 
+    pull(prop) %>% 
+    mean()
+}
+
+theta_c = theta_p(lastfm, 1:NROW(lastfm))
+
+lastfm %>% boot(statistic = theta_p, R = 2000) %>%
+  tidy(conf.level = 0.95, conf.int = TRUE)
+
 
 ```
 
 
+
 2. Para os usuários que gostam de música muito pop (mediana_pop > 5), qual a correlação entre a popularidade mediana dos artistas escutado e a proporção dos artistas escutados que eram novos. 
+
+
+
+```{r}
+
+
+n_repeticoes = 2000
+
+
+correlacoes = c()
+
+for(i in  1:n_repeticoes) {
+  bootstrap_atual = lastfm %>% sample_n(300, replace = TRUE) %>% filter(mediana_pop >5) %>% mutate(prop = news/(news+old))
+  theta_cor = bootstrap_atual %>% cor(mediana_pop, prop)
+}
+
+
+
+```
 
