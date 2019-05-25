@@ -1,6 +1,6 @@
 ---
 title: "Implementando ICs"
-author: "Nazareno"
+author: "Marcus Vinicius Leite Costa"
 output:
   html_document:
     theme: readable
@@ -16,6 +16,7 @@ output:
 ```{r setup, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(boot)
 library(broom)
 theme_set(theme_bw())
 ```
@@ -52,7 +53,7 @@ proporcao_do_pai = lastfm %>% mutate(prop = news/(news+old)) %>% pull(prop) %>% 
 props_bootstraps = c()
 
 for(i in  1:n_repeticoes) {
-  prop_bootstrap_atual = lastfm %>% sample_n(300, replace = TRUE) %>% mutate(prop = news/(news+old)) %>% pull(prop) %>% mean()
+  prop_bootstrap_atual = lastfm %>% sample_n(300, replace = TRUE) %>% mutate(prop = news/(news+old)) %>% pull(prop)
   props_bootstraps = c(props_bootstraps, prop_bootstrap_atual)
 }
 
@@ -61,47 +62,87 @@ df_bootstraps = data.frame("bnum" = c(1:2000), "props" = props_bootstraps)
 df_bootstraps %>% ggplot(aes(x=props) ) + geom_histogram(fill="navy", alpha=.4, col="black") + geom_vline(aes(xintercept=proporcao_do_pai), color="red", size=2, alpha=.4)
 
 ```
-### Bootsrap implementado com a biblioteca
+
+### Bootstraps utilizando a biblioteca boot
 
 ```{r}
-library(boot)
 
 theta_p <- function(d, i) {
     d %>%
     slice(i)  %>% 
     mutate(prop = news/(news+old)) %>% 
-    pull(prop) %>% 
-    mean()
+    pull(prop)
 }
 
 theta_c = theta_p(lastfm, 1:NROW(lastfm))
 
-lastfm %>% boot(statistic = theta_p, R = 2000) %>%
+results = lastfm %>% boot(statistic = theta_p, R = 2000) %>%
   tidy(conf.level = 0.95, conf.int = TRUE)
+
+
+results %>% ggplot(aes(x=statistic) ) + geom_histogram(fill="navy", alpha=.4, col="black") + geom_vline(aes(xintercept=proporcao_do_pai), color="red", size=2, alpha=.4) + geom_vline(aes(xintercept=mean(conf.low)), color="blue", size=2, alpha=.4) + geom_vline(aes(xintercept=mean(conf.high)), color="blue", size=2, alpha=.4)
 
 
 ```
 
+## Conclusões questão 1
+
+Para ambos os plots, que se tratam da mesma métrica (proporção de novos artistas escutados), apenas mudando a forma de obtê-la, podemos notar uma grande concentração das proporções de novos artistas até pouco mais de 0.3, o que nos diz que, para os bootstraps obtidos, são poucas as pessoas que escutam novos artistas. Podemos ver também que, a média das proporções da amostra original (linha vermelha representada pelo dataframe lastfm) ficou localizada justamente na maior concentração das proporções dos seus bootstraps. Também podemos notar que a média da proporção da amostra original ficou dentro das médias dos intervalos de confiança (linhas azuis) gerados pelos bootstraps, por mais que esse intervalo se mostre bastante grande. Uma forma de obter um intervalo mais estreito e preciso, seria diminuir a confiança.
 
 
 2. Para os usuários que gostam de música muito pop (mediana_pop > 5), qual a correlação entre a popularidade mediana dos artistas escutado e a proporção dos artistas escutados que eram novos. 
 
-
+### Bootstraps implementados manualmente
 
 ```{r}
 
 
 n_repeticoes = 2000
 
+df_pai = lastfm %>% filter(mediana_pop >5) %>% mutate(prop = news/(news+old))
+correlacao_do_pai = cor(df_pai$mediana_pop, df_pai$prop)
 
 correlacoes = c()
 
 for(i in  1:n_repeticoes) {
   bootstrap_atual = lastfm %>% sample_n(300, replace = TRUE) %>% filter(mediana_pop >5) %>% mutate(prop = news/(news+old))
-  theta_cor = bootstrap_atual %>% cor(mediana_pop, prop)
+  theta_cor = cor(bootstrap_atual$mediana_pop, bootstrap_atual$prop)
+  correlacoes = c(correlacoes, theta_cor)
 }
+
+cor_bootstraps = data.frame("bnum" = c(1:n_repeticoes), "cor" = correlacoes)
+
+
+cor_bootstraps %>% ggplot(aes(x=cor)) + geom_histogram(fill="navy", alpha=.4, col="black") + geom_vline(aes(xintercept=correlacao_do_pai), color="red", size=2, alpha=.4)
+
 
 
 
 ```
+
+### Bootstraps utilizando a biblioteca boot
+
+```{r}
+
+theta_cor_boot <- function(d, i) {
+    t_df = d %>%
+    slice(i)  %>%
+    mutate(prop = news/(news+old))
+    
+    cor(t_df$prop, t_df$mediana_pop)
+
+}
+
+
+cor_with_boot = lastfm %>% filter(mediana_pop > 5) %>% boot(statistic = theta_cor_boot, R = 2000) %>% 
+  tidy(conf.level = 0.95, conf.int = TRUE)
+
+
+glimpse(cor_with_boot)
+
+```
+
+## Conclusões questão 2
+
+Como podemos ver, quando filtramos apenas os usuários que realmente gostam de música pop (mediana_pop > 5), a correlação entre a popularidade mediana dos artistas escutado e a proporção dos artistas escutados que eram novos se mostra inexistente, de modo que, todos os valores obtidos para essa métrica tanto na amostra original quanto nos seus bootstraps é negativo, indicando assim, que essas variáveis não estão correlacionadas. 
 
